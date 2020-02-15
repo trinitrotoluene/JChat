@@ -1,0 +1,119 @@
+<project name="ChatServer" default="dist" basedir=".">
+    <description>
+        CM10228 Chat Server Project
+    </description>
+    <property name="replaceregex" value="(package|import)\s(?!java\.)(\w+\.?)+;(\r?\n)+"/>
+    <property name="src" location="co/uk/michallet/chatapp"/>
+    <property name="build" location="build"/>
+    <property name="server-port" value="14001"/>
+    <property name="client-port" value="14001"/>
+    <property name="client-host" value="127.0.0.1"/>
+
+    <target name="init">
+        <tstamp/>
+        <mkdir dir="${build}"/>
+        <delete>
+            <fileset dir="${build}">
+                <include name="**/*"/>
+            </fileset>
+        </delete>
+        <mkdir dir="${build}/server"/>
+        <mkdir dir="${build}/client"/>
+        <mkdir dir="${build}/common"/>
+    </target>
+
+    <target name="relocate" depends="init">
+        <tstamp/>
+        <delete>
+            <fileset dir="${build}/common">
+                <include name="*.java"/>
+            </fileset>
+            <fileset dir="${build}/server">
+                <include name="*.java"/>
+            </fileset>
+            <fileset dir="${build}/client">
+                <include name="*.java"/>
+            </fileset>
+        </delete>
+
+        <copy todir="${build}/common" flatten="true" force="true">
+            <fileset dir="${src}/common">
+                <include name="**/*.java"/>
+            </fileset>
+            <filterchain>
+                <replaceregex flags="gm" byline="false" pattern="${replaceregex}"/>
+            </filterchain>
+        </copy>
+
+        <copy todir="${build}/server" flatten="true" force="true">
+            <fileset dir="${src}/server">
+                <include name="**/*.java"/>
+            </fileset>
+            <filterchain>
+                <replaceregex flags="gm" byline="false" pattern="${replaceregex}" replace=""/>
+            </filterchain>
+        </copy>
+        <copy todir="${build}/client" flatten="true" force="true">
+            <fileset dir="${src}/client">
+                <include name="**/*.java"/>
+            </fileset>
+            <filterchain>
+                <replaceregex flags="gm" byline="false" pattern="${replaceregex}" replace=""/>
+            </filterchain>
+        </copy>
+
+        <copy todir="${build}/server">
+            <fileset dir="${build}/common"/>
+        </copy>
+        <copy todir="${build}/client">
+            <fileset dir="${build}/common"/>
+        </copy>
+    </target>
+
+    <target name="dist" depends="relocate">
+        <tstamp/>
+        <delete dir="${build}/dist"/>
+        <mkdir dir="${build}/dist"/>
+
+        <copy todir="${build}/dist">
+            <fileset dir="${build}/client"/>
+            <fileset dir="${build}/server"/>
+            <fileset dir="${build}/common"/>
+        </copy>
+    </target>
+
+    <target name="compile-server" depends="relocate">
+        <tstamp/>
+        <javac srcdir="${build}/server" destdir="${build}" release="10" listfiles="true"/>
+    </target>
+
+    <target name="compile-client" depends="relocate">
+        <tstamp/>
+        <javac srcdir="${build}/client" destdir="${build}" release="10" listfiles="true"/>
+    </target>
+
+    <target name="compile" depends="compile-client,compile-server"/>
+
+    <target name="exec-server" depends="compile-server">
+        <tstamp/>
+        <java fork="true" failonerror="true" classname="ChatServer" classpath="${build}">
+            <classpath>
+                <pathelement location="build/ChatServer.class"/>
+            </classpath>
+            <arg line="-csp"/>
+            <arg line="${server-port}"/>
+        </java>
+    </target>
+
+    <target name="exec-client" depends="compile-client">
+        <tstamp/>
+        <java fork="true" failonerror="true" classname="ChatClient" classpath="${build}">
+            <arg line="-ccp"/>
+            <arg line="${client-port}"/>
+            <arg line="-cca"/>
+            <arg line="${client-host}"/>
+        </java>
+    </target>
+
+    <target name="exec" depends="exec-client,exec-server"/>
+</project>
