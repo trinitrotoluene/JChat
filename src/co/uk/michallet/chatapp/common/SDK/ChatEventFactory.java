@@ -2,12 +2,26 @@ package co.uk.michallet.chatapp.common.SDK;
 
 import co.uk.michallet.chatapp.common.net.ChatEvent;
 import co.uk.michallet.chatapp.common.net.SocketOpCode;
+import co.uk.michallet.chatapp.common.net.models.DmEventArgs;
 import co.uk.michallet.chatapp.common.net.models.MessageSendEventArgs;
 import co.uk.michallet.chatapp.common.net.models.UserChangeNameArgs;
 import co.uk.michallet.chatapp.common.net.models.UserJoinEventArgs;
+import co.uk.michallet.chatapp.common.net.models.UserLeftEventArgs;
 
 public class ChatEventFactory {
     private ChatEventFactory() {
+    }
+
+    public static ChatEvent fromDM(String sender, String target, String content) {
+        var event = new ChatEvent();
+        var eventArgs = new DmEventArgs();
+        eventArgs.setSenderName(sender);
+        eventArgs.setTargetName(target);
+        eventArgs.setContent(content);
+        event.setOpCode(SocketOpCode.DIRECT_MESSAGE.getValue());
+        event.setEventArgs(eventArgs);
+
+        return event;
     }
 
     public static ChatEvent fromMessage(String author, String message) {
@@ -36,7 +50,17 @@ public class ChatEventFactory {
         var event = new ChatEvent();
         var eventArgs = new UserJoinEventArgs();
         eventArgs.setName(name);
-        event.setOpCode(SocketOpCode.USERJOIN.getValue());
+        event.setOpCode(SocketOpCode.USER_JOIN.getValue());
+        event.setEventArgs(eventArgs);
+
+        return event;
+    }
+
+    public static ChatEvent fromUserLeave(String name) {
+        var event = new ChatEvent();
+        var eventArgs = new UserLeftEventArgs();
+        eventArgs.setName(name);
+        event.setOpCode(SocketOpCode.USER_LEAVE.getValue());
         event.setEventArgs(eventArgs);
 
         return event;

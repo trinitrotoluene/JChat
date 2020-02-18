@@ -1,20 +1,17 @@
 package co.uk.michallet.chatapp.server;
 
 import co.uk.michallet.chatapp.common.net.ChatEvent;
-import co.uk.michallet.chatapp.common.net.SocketOpCode;
-import co.uk.michallet.chatapp.common.net.models.EventArgs;
-import co.uk.michallet.chatapp.common.net.models.MessageSendEventArgs;
-import co.uk.michallet.chatapp.common.net.models.UserJoinEventArgs;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ConcurrentMessageBus {
     private Map<String, ClientSession> _subscribers;
 
     public ConcurrentMessageBus() {
-        _subscribers = new HashMap<>();
+        _subscribers = new ConcurrentHashMap<>();
     }
 
     private synchronized boolean getIsNameTaken(String name) {
@@ -50,5 +47,13 @@ public class ConcurrentMessageBus {
 
     public synchronized void removeClient(ClientSession session) {
         _subscribers.remove(session.getName());
+    }
+
+    public synchronized ClientSession getClient(String name) {
+        return _subscribers.getOrDefault(name, null);
+    }
+
+    public synchronized Set<String> getNames() {
+        return _subscribers.keySet();
     }
 }

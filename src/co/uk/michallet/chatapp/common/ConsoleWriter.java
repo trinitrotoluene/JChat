@@ -1,6 +1,4 @@
-package co.uk.michallet.chatapp.server;
-
-import co.uk.michallet.chatapp.common.IOutputWriter;
+package co.uk.michallet.chatapp.common;
 
 public class ConsoleWriter implements IOutputWriter {
     @Override

@@ -32,15 +32,14 @@ public class ClientSessionNegotiator implements Supplier<ClientSession> {
             _logger.debug("hello");
 
             var userJoinEvent = readEvent();
-            if (userJoinEvent.getEventArgs() == null || SocketOpCode.fromValue(userJoinEvent.getOpCode()) != SocketOpCode.USERJOIN) {
+            if (userJoinEvent.getEventArgs() == null || SocketOpCode.fromValue(userJoinEvent.getOpCode()) != SocketOpCode.USER_JOIN) {
                 _logger.debug("bad login message, aborting");
                 _socket.close();
                 return null;
             }
 
             _logger.debug("%s: identify", ((UserJoinEventArgs)userJoinEvent.getEventArgs()).getName());
-            // todo: validate login
-            // todo: send back indication of success
+
             return new ClientSession(_logger, _socket, (UserJoinEventArgs)userJoinEvent.getEventArgs(), _messageBus);
         }
         catch (IOException | ClassNotFoundException ioEx) {

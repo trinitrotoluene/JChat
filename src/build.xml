@@ -19,6 +19,7 @@
         </delete>
         <mkdir dir="${build}/server"/>
         <mkdir dir="${build}/client"/>
+        <mkdir dir="${build}/bot"/>
         <mkdir dir="${build}/common"/>
     </target>
 
@@ -32,6 +33,9 @@
                 <include name="*.java"/>
             </fileset>
             <fileset dir="${build}/client">
+                <include name="*.java"/>
+            </fileset>
+            <fileset dir="${build}/bot">
                 <include name="*.java"/>
             </fileset>
         </delete>
@@ -53,8 +57,18 @@
                 <replaceregex flags="gm" byline="false" pattern="${replaceregex}" replace=""/>
             </filterchain>
         </copy>
+
         <copy todir="${build}/client" flatten="true" force="true">
             <fileset dir="${src}/client">
+                <include name="**/*.java"/>
+            </fileset>
+            <filterchain>
+                <replaceregex flags="gm" byline="false" pattern="${replaceregex}" replace=""/>
+            </filterchain>
+        </copy>
+
+        <copy todir="${build}/bot" flatten="true" force="true">
+            <fileset dir="${src}/bot">
                 <include name="**/*.java"/>
             </fileset>
             <filterchain>
@@ -68,6 +82,9 @@
         <copy todir="${build}/client">
             <fileset dir="${build}/common"/>
         </copy>
+        <copy todir="${build}/bot">
+            <fileset dir="${build}/common"/>
+        </copy>
     </target>
 
     <target name="dist" depends="relocate">
@@ -77,6 +94,7 @@
 
         <copy todir="${build}/dist">
             <fileset dir="${build}/client"/>
+            <fileset dir="${build}/bot"/>
             <fileset dir="${build}/server"/>
             <fileset dir="${build}/common"/>
         </copy>
@@ -84,15 +102,20 @@
 
     <target name="compile-server" depends="relocate">
         <tstamp/>
-        <javac srcdir="${build}/server" destdir="${build}" release="10" listfiles="true"/>
+        <javac srcdir="${build}/server" destdir="${build}" release="11" listfiles="true"/>
     </target>
 
     <target name="compile-client" depends="relocate">
         <tstamp/>
-        <javac srcdir="${build}/client" destdir="${build}" release="10" listfiles="true"/>
+        <javac srcdir="${build}/client" destdir="${build}" release="11" listfiles="true"/>
     </target>
 
-    <target name="compile" depends="compile-client,compile-server"/>
+    <target name="compile-bot" depends="relocate">
+        <tstamp/>
+        <javac srcdir="${build}/bot" destdir="${build}" release="11" listfiles="true"/>
+    </target>
+
+    <target name="compile" depends="compile-client,compile-server,compile-bot"/>
 
     <target name="exec-server" depends="compile-server">
         <tstamp/>

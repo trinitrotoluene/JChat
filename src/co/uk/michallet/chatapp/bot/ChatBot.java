@@ -1,20 +1,17 @@
-package co.uk.michallet.chatapp.client;
+package co.uk.michallet.chatapp.bot;
 
 import co.uk.michallet.chatapp.common.ConfigurationBuilder;
+import co.uk.michallet.chatapp.common.ConsoleWriter;
 import co.uk.michallet.chatapp.common.IConfiguration;
 import co.uk.michallet.chatapp.common.ILogger;
 import co.uk.michallet.chatapp.common.IOutputWriter;
 import co.uk.michallet.chatapp.common.SDK.ChatEventFactory;
 import co.uk.michallet.chatapp.common.SDK.GenericClient;
-import co.uk.michallet.chatapp.common.commands.CommandNotFoundResult;
 import co.uk.michallet.chatapp.common.commands.CommandService;
 import co.uk.michallet.chatapp.common.logging.DefaultLogger;
 import co.uk.michallet.chatapp.common.net.ChatEvent;
 import co.uk.michallet.chatapp.common.net.SocketOpCode;
-import co.uk.michallet.chatapp.common.net.models.DmEventArgs;
 import co.uk.michallet.chatapp.common.net.models.MessageSendEventArgs;
-import co.uk.michallet.chatapp.common.net.models.UserJoinEventArgs;
-import co.uk.michallet.chatapp.common.net.models.UserLeftEventArgs;
 
 import java.io.IOException;
 import java.net.Inet4Address;
@@ -22,30 +19,29 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Scanner;
+import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 
-public class ChatClient {
-    private IConfiguration _config;
-    private ILogger _logger;
-    private IOutputWriter _displayOutput;
-    private GenericClient _client;
-    private CommandService<ClientCommandContext> _commands;
-    private CompletableFuture<Void> _listenTask;
-
-    private final Scanner _input = new Scanner(System.in);
-
-    private int _backoff = 2;
+public class ChatBot {
+    private int _backoff;
     private final int BACKOFF_FACTOR = 2;
 
-    public ChatClient(IConfiguration config, ILogger logger, IOutputWriter displayOutput) {
-        _config = config;
+    private final GenericClient _client;
+    private final ILogger _logger;
+    private final IConfiguration _config;
+    private final CommandService<BotCommandContext> _commands;
+
+    private CompletableFuture<Void> _listenTask;
+
+    public ChatBot(IConfiguration config, ILogger logger) {
         _logger = logger;
-        _displayOutput = displayOutput;
-        _client = new GenericClient(logger);
+        _config = config;
+        _client = new GenericClient(_logger);
         _commands = new CommandService<>();
-        _commands.registerCommands(ClientCommands.class);
+        _commands.registerCommands(BotCommands.class);
     }
 
     public synchronized void cancel() {
@@ -88,7 +84,6 @@ public class ChatClient {
         }
 
         try {
-            _displayOutput.clearAll();
             _logger.info("connected!");
             _listenTask = _client.runAsync();
             _listenTask.get();
@@ -101,86 +96,44 @@ public class ChatClient {
     }
 
     private void hookClient() {
-        _client.setEventSubscriber(this::acceptEvent);
-        _client.setEventProducer(this::produceEvent);
+        _client.setEventProducer(() -> {
+            try {
+                new CyclicBarrier(2).await();
+            }
+            catch (InterruptedException | BrokenBarrierException iDislikeCheckedExceptions) {
+                Thread.currentThread().interrupt();
+            }
+            return null;
+        });
+        _client.setEventSubscriber(this::acceptCommands);
     }
 
-    private ChatEvent produceEvent() {
-        var message = _input.nextLine();
-
-        if (message.trim().length() == 0) {
-            _displayOutput.reset();
-            return null;
-        }
-
-        if (tryGetAndExecuteCommand(message)) {
-            return null;
-        }
-
-        return ChatEventFactory.fromMessage(null, message);
-    }
-
-    private void acceptEvent(ChatEvent event) {
-        switch (SocketOpCode.fromValue(event.getOpCode())) {
+    private void acceptCommands(ChatEvent chatEvent) {
+        switch (SocketOpCode.fromValue(chatEvent.getOpCode())) {
             case HELLO:
                 _logger.debug("received server handshake");
-                _client.sendEvent(ChatEventFactory.fromUserJoin(_config.getString("name", "Unnamed User")));
+                _client.sendEvent(ChatEventFactory.fromUserJoin(_config.getString("name", "Unnamed Bot")));
                 break;
             case MESSAGE:
-                var messageArgs = (MessageSendEventArgs)event.getEventArgs();
-                _displayOutput.write(String.format("<%s> %s", messageArgs.getAuthor(), messageArgs.getContent()));
-                break;
-            case USER_JOIN:
-                var joinArgs = (UserJoinEventArgs)event.getEventArgs();
-                _logger.info("%s joined the channel", joinArgs.getName());
-                break;
-            case USER_LEAVE:
-                var leaveArgs = (UserLeftEventArgs)event.getEventArgs();
-                _logger.info("%s left the channel", leaveArgs.getName());
-                break;
-            case DIRECT_MESSAGE:
-                var dmArgs = (DmEventArgs)event.getEventArgs();
-                _displayOutput.write(String.format("[%s -> %s] %s", dmArgs.getSenderName(), dmArgs.getTargetName(), dmArgs.getContent()));
+                var eventArgs = (MessageSendEventArgs)chatEvent.getEventArgs();
+                var commandTokens = eventArgs.getContent().split(" ");
+                try {
+                    var context = new BotCommandContext(this, _config, _logger);
+                    var result = _commands.execute(context, commandTokens[0], Arrays.copyOfRange(commandTokens, 1, commandTokens.length)).get();
+                }
+                catch (InterruptedException | ExecutionException ignored) {
+                }
                 break;
             default:
-                _logger.debug("received unknown opcode from server");
                 break;
         }
-    }
-
-    private boolean tryGetAndExecuteCommand(String message) {
-        var tokens = message.split(" ");
-        if (tokens.length < 1) {
-            return false;
-        }
-
-        try {
-            var context = new ClientCommandContext(this, _config, _logger);
-            var result = _commands.execute(context, tokens[0], Arrays.copyOfRange(tokens, 1, tokens.length)).get();
-
-            if (result instanceof CommandNotFoundResult) {
-                return false;
-            }
-
-            if (result.isSuccess()) {
-                _logger.debug("%s executed successfully", tokens[0]);
-            }
-            else {
-                _logger.warn("%s returned an error during execution: %s", result.getReason());
-            }
-            return true;
-        }
-        catch (ExecutionException | InterruptedException ignored) {
-        }
-
-        return false;
     }
 
     public static void main(String[] args) {
         var input = new Scanner(System.in);
 
-        var display = new DisplayWriter(15);
-        var logger = new DefaultLogger(ChatClient.class.getSimpleName(), Level.FINE, display);
+        var display = new ConsoleWriter();
+        var logger = new DefaultLogger(ChatBot.class.getSimpleName(), Level.FINE, display);
 
         var config = new ConfigurationBuilder()
                 .addConsole(args)
@@ -197,10 +150,10 @@ public class ChatClient {
             logger.info("your name for this session was set to %s", config.getString("name"));
         }
 
-        var client = new ChatClient(config, logger, display);
+        var bot = new ChatBot(config, logger);
 
         try {
-            client.connect();
+            bot.connect();
         }
         catch (InterruptedException interruptEx) {
             logger.error("main client thread was interrupted");
@@ -208,7 +161,7 @@ public class ChatClient {
     }
 
     private static void printHelp(IOutputWriter display) {
-        display.write("                 == Usage Instructions for ChatClient ==");
+        display.write("                 == Usage Instructions for ChatBot ==");
         display.write("");
         display.write("All options can be set in the GNU or POSIX formats i.e. -cca <value> --cca=<value>");
         display.write("cca       | Sets the host of the server the client will attempt a connection to.");
