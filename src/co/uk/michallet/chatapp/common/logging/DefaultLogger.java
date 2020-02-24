@@ -6,7 +6,12 @@ import co.uk.michallet.chatapp.common.IOutputWriter;
 import java.util.concurrent.Semaphore;
 import java.util.logging.Level;
 
+/**
+ * Provides a default console logging implementation.
+ */
 public class DefaultLogger implements ILogger {
+    // Colour codes from ECMA-048 SGR - SELECT GRAPHIC RENDITION
+    // https://www.ecma-international.org/publications/files/ECMA-ST/Ecma-048.pdf Page 61
     private static final String ANSI_RESET = "\u001B[0m";
     private static final String ANSI_RED = "\u001B[31m";
     private static final String ANSI_ORANGE = "\u001B[33m";
@@ -49,7 +54,7 @@ public class DefaultLogger implements ILogger {
         if (_level.intValue() > level.intValue()) {
             return;
         }
-
+        // To get colour formatting without tinting unrelated text, you need ANSI_RESET<ANSI_COLOUR><CONTENT><ANSI_RESET>
         String colourFormat = "";
         switch (level.getName()) {
             case "FINE":
@@ -82,6 +87,8 @@ public class DefaultLogger implements ILogger {
                 .append(ANSI_RESET);
 
         try {
+            // Only this portion is not threadsafe, writing to the console from multiple threads simultaneously
+            // may result in garbled output or incorrect colour formatting.
             _outLock.acquire();
             _writer.write(finalFormat.toString());
             _outLock.release();

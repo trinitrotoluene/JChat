@@ -8,6 +8,9 @@ import co.uk.michallet.chatapp.common.net.models.UserChangeNameArgs;
 import co.uk.michallet.chatapp.common.net.models.UserJoinEventArgs;
 import co.uk.michallet.chatapp.common.net.models.UserLeftEventArgs;
 
+/**
+ * Helper class for quickly creating ChatEvents
+ */
 public class ChatEventFactory {
     private ChatEventFactory() {
     }

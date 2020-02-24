@@ -7,6 +7,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
 
+/**
+ * Extensible configuration builder, allowing more providers to be added in the future.
+ */
 public class ConfigurationBuilder {
     private Set<IConfigurationProvider> _providers;
 

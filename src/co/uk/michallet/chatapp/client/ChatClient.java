@@ -26,6 +26,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 
+/**
+ * Console based client implementation
+ */
 public class ChatClient {
     private IConfiguration _config;
     private ILogger _logger;
@@ -36,7 +39,9 @@ public class ChatClient {
 
     private final Scanner _input = new Scanner(System.in);
 
+    // Default value for backoff
     private int _backoff = 2;
+    // Exponent to use for exponential backoff
     private final int BACKOFF_FACTOR = 2;
 
     public ChatClient(IConfiguration config, ILogger logger, IOutputWriter displayOutput) {
@@ -72,9 +77,12 @@ public class ChatClient {
             return;
         }
 
+        // Set the supplier and consumer methods of our GenericClient
         hookClient();
 
+        // Loop
         for (;;) {
+            // Attempt a connection
             try {
                 _logger.info("connecting to %s:%s", host, port);
                 _client.connect(host, port);
@@ -90,13 +98,15 @@ public class ChatClient {
         try {
             _displayOutput.clearAll();
             _logger.info("connected!");
+            // Start up the client listener task
             _listenTask = _client.runAsync();
+            // Block on it so the calling thread does not exit and kill the application
             _listenTask.get();
         }
         catch (ExecutionException e) {
             _logger.error("the server connection was aborted");
         }
-
+        // Clean up
         _client.dispose();
     }
 
@@ -105,6 +115,10 @@ public class ChatClient {
         _client.setEventProducer(this::produceEvent);
     }
 
+    /**
+     * Reads in text from the console and returns null if it was a command
+     * else returns a sendmessage event to be sent to the server.
+     */
     private ChatEvent produceEvent() {
         var message = _input.nextLine();
 
@@ -120,34 +134,49 @@ public class ChatClient {
         return ChatEventFactory.fromMessage(null, message);
     }
 
+    /**
+     * Accepts events from the socket and switches on the OpCode to handle various event types.
+     */
     private void acceptEvent(ChatEvent event) {
         switch (SocketOpCode.fromValue(event.getOpCode())) {
+            // Opening handshake
             case HELLO:
+                // Respond with a USER_JOIN to log in
                 _logger.debug("received server handshake");
                 _client.sendEvent(ChatEventFactory.fromUserJoin(_config.getString("name", "Unnamed User")));
                 break;
+            // Received a message
             case MESSAGE:
                 var messageArgs = (MessageSendEventArgs)event.getEventArgs();
                 _displayOutput.write(String.format("<%s> %s", messageArgs.getAuthor(), messageArgs.getContent()));
                 break;
+            // A user joined the channel
             case USER_JOIN:
                 var joinArgs = (UserJoinEventArgs)event.getEventArgs();
                 _logger.info("%s joined the channel", joinArgs.getName());
                 break;
+            // A user left the channel
             case USER_LEAVE:
                 var leaveArgs = (UserLeftEventArgs)event.getEventArgs();
                 _logger.info("%s left the channel", leaveArgs.getName());
                 break;
+            // Received a direct message
             case DIRECT_MESSAGE:
                 var dmArgs = (DmEventArgs)event.getEventArgs();
                 _displayOutput.write(String.format("[%s -> %s] %s", dmArgs.getSenderName(), dmArgs.getTargetName(), dmArgs.getContent()));
                 break;
+            // Received an unexpected OpCode
             default:
                 _logger.debug("received unknown opcode from server");
                 break;
         }
     }
 
+    /**
+     * Attempts to find and execute a command.
+     * @param message The string to try and find a command with.
+     * @return Whether a command was found.
+     */
     private boolean tryGetAndExecuteCommand(String message) {
         var tokens = message.split(" ");
         if (tokens.length < 1) {
@@ -179,6 +208,7 @@ public class ChatClient {
     public static void main(String[] args) {
         var input = new Scanner(System.in);
 
+        // Use a displaywriter with custom height rather than the default ConsoleWriter implementation
         var display = new DisplayWriter(15);
         var logger = new DefaultLogger(ChatClient.class.getSimpleName(), Level.FINE, display);
 

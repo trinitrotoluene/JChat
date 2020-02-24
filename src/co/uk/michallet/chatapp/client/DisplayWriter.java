@@ -33,6 +33,7 @@ public class DisplayWriter implements IOutputWriter {
     }
 
     private synchronized void clearAndResetConsole() {
+        // Same resets used in ConsoleWriter
         System.out.print("\033[2J\033[H");
     }
 
@@ -46,7 +47,7 @@ public class DisplayWriter implements IOutputWriter {
         for (int i = writtenLines; i < _height; i++) {
             System.out.println();
         }
-        System.out.println("");
-        System.out.print(">");
+        System.out.println("---");
+        System.out.print(">>");
     }
 }

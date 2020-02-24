@@ -1,5 +1,8 @@
 package co.uk.michallet.chatapp.common.commands;
 
+/**
+ * Represents the runtime result of a command execution.
+ */
 public class ExecutionResult implements IResult {
     private boolean _isSuccess;
     private String _reason;

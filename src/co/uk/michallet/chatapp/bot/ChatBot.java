@@ -25,6 +25,10 @@ import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 
+/**
+ * Bot implementation of ChatClient
+ * If something isn't documented here it's probably documented there.
+ */
 public class ChatBot {
     private int _backoff;
     private final int BACKOFF_FACTOR = 2;
@@ -98,9 +102,11 @@ public class ChatBot {
     private void hookClient() {
         _client.setEventProducer(() -> {
             try {
+                // Block until interrupted to prevent the calling loop from spinning constantly.
                 new CyclicBarrier(2).await();
             }
             catch (InterruptedException | BrokenBarrierException iDislikeCheckedExceptions) {
+                // Donate to the WWF, save an IRQ
                 Thread.currentThread().interrupt();
             }
             return null;

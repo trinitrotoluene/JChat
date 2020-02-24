@@ -12,6 +12,9 @@ public class ServerCommands {
         _context = context;
     }
 
+    /**
+     * Sends a message to every client session connected to the server.
+     */
     @Command("BROADCAST")
     public IResult broadcast(String[] args) {
         var message = String.join(" ", args);
@@ -19,6 +22,9 @@ public class ServerCommands {
         return new ExecutionResult(true);
     }
 
+    /**
+     * Lists the name of every connected client.
+     */
     @Command("LIST")
     public IResult list(String[] args) {
         var message = new StringBuilder();
@@ -30,6 +36,9 @@ public class ServerCommands {
         return new ExecutionResult(true);
     }
 
+    /**
+     * Shuts down the server.
+     */
     @Command("EXIT")
     public IResult exit(String[] args) {
         _context.getServer().abort();

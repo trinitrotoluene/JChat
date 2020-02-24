@@ -4,6 +4,9 @@ import co.uk.michallet.chatapp.common.IConfiguration;
 
 import java.util.Map;
 
+/**
+ * Default configuration implementation.
+ */
 public class Configuration implements IConfiguration {
     private final Map<String, String> _values;
 

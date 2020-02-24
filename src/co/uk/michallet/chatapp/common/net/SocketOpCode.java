@@ -1,5 +1,9 @@
 package co.uk.michallet.chatapp.common.net;
 
+/**
+ * OpCodes are used to control what the EventArgs of a ChatEvent are interpreted as by the client and server when they
+ * receive one.
+ */
 public enum SocketOpCode {
     HELLO(0),
     GOODBYE(1),

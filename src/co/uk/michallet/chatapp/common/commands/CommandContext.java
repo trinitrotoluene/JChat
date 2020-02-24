@@ -3,7 +3,10 @@ package co.uk.michallet.chatapp.common.commands;
 import co.uk.michallet.chatapp.common.IConfiguration;
 import co.uk.michallet.chatapp.common.ILogger;
 
-public class CommandContext {
+/**
+ * Base class for custom CommandContext implementations, providing contextual information to commands at runtime.
+ */
+public abstract class CommandContext {
     private IConfiguration _config;
     private ILogger _logger;
 

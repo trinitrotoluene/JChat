@@ -2,6 +2,9 @@ package co.uk.michallet.chatapp.common.commands;
 
 import java.lang.reflect.Method;
 
+/**
+ * Stores the type and method information of a command.
+ */
 public class CommandInfo {
     private final Class _module;
     private final Method _method;
