@@ -18,11 +18,11 @@ public class ConcurrentMessageBus {
         _subscribers = new ConcurrentHashMap<>();
     }
 
-    private synchronized boolean getIsNameTaken(String name) {
+    private boolean getIsNameTaken(String name) {
         return _subscribers.containsKey(name);
     }
 
-    public synchronized boolean tryRename(String oldName, String newName) {
+    public boolean tryRename(String oldName, String newName) {
         if (getIsNameTaken(newName)) {
             return false;
         }
@@ -32,7 +32,7 @@ public class ConcurrentMessageBus {
         return true;
     }
 
-    public synchronized void broadcast(ChatEvent event) {
+    public void broadcast(ChatEvent event) {
         for (var client : _subscribers.values()) {
             CompletableFuture.runAsync(() -> {
                 client.send(event);
@@ -40,7 +40,7 @@ public class ConcurrentMessageBus {
         }
     }
 
-    public synchronized boolean tryAddClient(ClientSession session) {
+    public boolean tryAddClient(ClientSession session) {
         if (getIsNameTaken(session.getName())) {
             return false;
         }
@@ -49,17 +49,15 @@ public class ConcurrentMessageBus {
         return true;
     }
 
-    public synchronized void removeClient(ClientSession session) {
+    public void removeClient(ClientSession session) {
         _subscribers.remove(session.getName());
     }
 
-    public synchronized ClientSession getClient(String name) {
+    public ClientSession getClient(String name) {
         return _subscribers.getOrDefault(name, null);
     }
 
-    public synchronized Set<String> getNames() {
-        // On normal HashMap<T, V> the keySet is instantiated on first call and then updated thereafter
-        // so returning this would open the caller up to thread safety issues, hence ConcurrentHashMap
+    public Set<String> getNames() {
         return _subscribers.keySet();
     }
 }

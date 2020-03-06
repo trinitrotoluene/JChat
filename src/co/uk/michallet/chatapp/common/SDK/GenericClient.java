@@ -1,5 +1,6 @@
 package co.uk.michallet.chatapp.common.SDK;
 
+import co.uk.michallet.chatapp.common.AppThreadPool;
 import co.uk.michallet.chatapp.common.ILogger;
 import co.uk.michallet.chatapp.common.net.ChatEvent;
 
@@ -39,6 +40,7 @@ public class GenericClient {
      */
     public void connect(InetAddress addr, int port) throws IOException {
         _socket = new Socket(addr, port);
+        Runtime.getRuntime().addShutdownHook(new Thread(AppThreadPool.getInstance()::shutdown));
     }
 
     /**
@@ -66,10 +68,10 @@ public class GenericClient {
                 catch (ExecutionException ignored) {
                 }
             }
-        });
+        }, AppThreadPool.getInstance());
         // Spin up the dispatching (receiving) loop
         var dispatchingFuture = CompletableFuture.runAsync(() -> {
-            while (_socket.isConnected() && !Thread.interrupted()) {
+            while (!_socket.isClosed() && !Thread.interrupted()) {
                 // Asynchronously return a ChatEvent to the chained continuation (_eventHandler)
                 var iterationFuture = CompletableFuture.supplyAsync(() -> {
                     try {
@@ -94,7 +96,7 @@ public class GenericClient {
                 catch (ExecutionException ignored) {
                 }
             }
-        });
+        }, AppThreadPool.getInstance());
 
         // Wrap them both info a future the caller can block on or chain their own continuation to.
         return CompletableFuture.allOf(producingFuture, dispatchingFuture);
@@ -119,6 +121,9 @@ public class GenericClient {
 
     public synchronized void dispose() {
         try {
+            if (_socket.isClosed()) {
+                return;
+            }
             _logger.info("disconnecting");
             _socket.close();
             _logger.info("disconnected");

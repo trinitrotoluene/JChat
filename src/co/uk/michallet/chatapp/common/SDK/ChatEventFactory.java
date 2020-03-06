@@ -75,4 +75,11 @@ public class ChatEventFactory {
 
         return event;
     }
+
+    public static ChatEvent fromGoodbye() {
+        var event = new ChatEvent();
+        event.setOpCode(SocketOpCode.GOODBYE.getValue());
+
+        return event;
+    }
 }

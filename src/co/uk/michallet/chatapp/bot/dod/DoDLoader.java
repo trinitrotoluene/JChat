@@ -1,37 +1,28 @@
 package co.uk.michallet.chatapp.bot.dod;
 
 import java.io.File;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class DoDLoader {
-    public void run(String[] args) {
+    public Game run() {
         UI.motd();
 
         try {
             var map = getAndLoadMapFile();
 
-            var players = new PlayerBase[2];
-            // Get valid random starting positions for two players
-            var playerPos = MapUtil.getLegalStartingPoint(map);
-            players[0] = new Player(playerPos);
-            var botPos = MapUtil.getLegalStartingPoint(map, playerPos);
-            players[1] = new BotPlayer(botPos, map);
+            var players = new ConcurrentLinkedQueue<PlayerBase>();
+            var botPos = MapUtil.getLegalStartingPoint(map);
+            players.add(new BotPlayer(botPos, map));
 
             var game = new Game(map, players);
 
-            game.run();
-
-            if (game.isWon()) {
-                UI.write("WIN");
-                UI.win();
-            }
-            else {
-                UI.write("LOSE");
-                UI.lose();
-            }
+            return game;
         }
         catch (Exception mapEx) {
             UI.error(mapEx);
         }
+
+        return null;
     }
 
     private GameMap getAndLoadMapFile() throws MapParseException {
@@ -64,6 +55,4 @@ public class DoDLoader {
             System.out.println(String.format("%s) %s", i + 1, mapFiles[i].getName()));
         }
     }
-
-
 }

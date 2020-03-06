@@ -1,5 +1,11 @@
 package co.uk.michallet.chatapp.bot;
 
+import co.uk.michallet.chatapp.bot.dod.DoDLoader;
+import co.uk.michallet.chatapp.bot.dod.Game;
+import co.uk.michallet.chatapp.bot.dod.MapUtil;
+import co.uk.michallet.chatapp.bot.dod.PlayerBase;
+import co.uk.michallet.chatapp.bot.dod.Point2D;
+import co.uk.michallet.chatapp.bot.dod.TileFlags;
 import co.uk.michallet.chatapp.common.ConfigurationBuilder;
 import co.uk.michallet.chatapp.common.ConsoleWriter;
 import co.uk.michallet.chatapp.common.HelpMenuBuilder;
@@ -7,8 +13,6 @@ import co.uk.michallet.chatapp.common.IConfiguration;
 import co.uk.michallet.chatapp.common.ILogger;
 import co.uk.michallet.chatapp.common.SDK.ChatEventFactory;
 import co.uk.michallet.chatapp.common.SDK.GenericClient;
-import co.uk.michallet.chatapp.common.commands.CommandNotFoundResult;
-import co.uk.michallet.chatapp.common.commands.CommandService;
 import co.uk.michallet.chatapp.common.logging.DefaultLogger;
 import co.uk.michallet.chatapp.common.net.ChatEvent;
 import co.uk.michallet.chatapp.common.net.SocketOpCode;
@@ -18,7 +22,6 @@ import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.Arrays;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CyclicBarrier;
@@ -26,39 +29,39 @@ import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 
 /**
- * Bot implementation of ChatClient
- * If something isn't documented here it's probably documented there.
+ * Modified version of the ChatBot that allows you to play the DoD game.
  */
-public class ChatBot {
+public class DoDClient {
     private int _backoff;
     private final int BACKOFF_FACTOR = 2;
 
-    private final GenericClient _client;
-    private final ILogger _logger;
     private final IConfiguration _config;
-    private final CommandService<BotCommandContext> _commands;
+    private final DefaultLogger _logger;
+    private final GenericClient _client;
+    private final Game _game;
 
     private CompletableFuture<Void> _listenTask;
+    private CompletableFuture<Void> _gameTask;
 
-    public ChatBot(IConfiguration config, ILogger logger) {
-        _logger = logger;
+    public DoDClient(IConfiguration config, DefaultLogger logger, Game game) {
         _config = config;
-        _client = new GenericClient(_logger);
-        _commands = new CommandService<>();
-        _commands.registerCommands(BotCommands.class);
-    }
+        _logger = logger;
+        _game = game;
 
-    public synchronized void cancel() {
-        if (_listenTask != null) {
-            _listenTask.cancel(true);
-        }
+        _client = new GenericClient(_logger);
     }
 
     public void sendEvent(ChatEvent event) {
         _client.sendEvent(event);
     }
 
+    public ILogger getLogger() {
+        return _logger;
+    }
+
     public void connect() throws InterruptedException {
+        _gameTask = CompletableFuture.runAsync(_game::run);
+
         var serverHost = _config.getString("cca", "127.0.0.1");
         var serverPort = _config.getString("ccp", "14001");
 
@@ -102,11 +105,9 @@ public class ChatBot {
     private void hookClient() {
         _client.setEventProducer(() -> {
             try {
-                // Block until interrupted to prevent the calling loop from spinning constantly.
                 new CyclicBarrier(2).await();
             }
             catch (InterruptedException | BrokenBarrierException iDislikeCheckedExceptions) {
-                // Donate to the WWF, save an IRQ
                 Thread.currentThread().interrupt();
             }
             return null;
@@ -114,52 +115,65 @@ public class ChatBot {
         _client.setEventSubscriber(this::acceptCommands);
     }
 
-    private void acceptCommands(ChatEvent chatEvent) {
-        switch (SocketOpCode.fromValue(chatEvent.getOpCode())) {
+    private void acceptCommands(ChatEvent event) {
+        switch (SocketOpCode.fromValue(event.getOpCode())) {
             case HELLO:
-                _logger.debug("received server handshake");
-                _client.sendEvent(ChatEventFactory.fromUserJoin(_config.getString("name", "Unnamed Bot")));
-                break;
+                _logger.debug("Received server handshake");
+                _client.sendEvent(ChatEventFactory.fromUserJoin(_config.getString("name", "DoDClient")));
+                return;
             case MESSAGE:
-                var eventArgs = (MessageSendEventArgs)chatEvent.getEventArgs();
-                var commandTokens = eventArgs.getContent().split(" ");
-                if (eventArgs.getAuthor().equals(_config.getString("name"))) {
-                    return;
-                }
+                var eventArgs = (MessageSendEventArgs)event.getEventArgs();
+                _logger.debug("%s: %s", eventArgs.getAuthor(), eventArgs.getContent());
 
-                try {
-                    var context = new BotCommandContext(this, _config, _logger);
-                    var result = _commands.execute(context, commandTokens[0], Arrays.copyOfRange(commandTokens, 1, commandTokens.length)).get();
-
-                    if (result instanceof CommandNotFoundResult) {
+                // If the Game is currently waiting for a player's input
+                if (_game.getCurrentPlayer() instanceof NetworkedPlayer) {
+                    var player = (NetworkedPlayer)_game.getCurrentPlayer();
+                    // Check whether the player we're waiting for is the one sending this message
+                    if (eventArgs.getAuthor().equals(player.getName())) {
+                        _logger.debug("Put next command for player %s: %s", eventArgs.getAuthor(), eventArgs.getContent());
+                        player.putNextCommand(eventArgs.getContent());
                         return;
                     }
+                }
 
-                    if (!result.isSuccess()) {
-                        _logger.warn("A command ran unsuccessfully: %s", result.getReason());
+                if (eventArgs.getContent().toLowerCase().equals("join")) {
+                    _logger.info("%s tried to join the game", eventArgs.getAuthor());
+                    // Ensure the user isn't already playing
+                    for (var player : _game.getPlayers()) {
+                        if (player instanceof NetworkedPlayer && ((NetworkedPlayer)player).getName().equals(eventArgs.getAuthor())) {
+                            return;
+                        }
                     }
-                    else {
-                        _logger.debug("Executed a command successfully");
-                    }
+                    // Get all the positions of currently playing users
+                    var positions = _game.getPlayers().stream()
+                            .map(PlayerBase::getPos)
+                            .toArray(Point2D[]::new);
+                    // Calculate a valid starting point
+                    var pos = MapUtil.getLegalStartingPoint(_game.getMap(), positions);
+                    _game.getPlayers().add(
+                            new NetworkedPlayer(this, eventArgs.getAuthor(), pos)
+                    );
+                    // Set the flags for the tile of player we've just placed
+                    var tile = _game.getMap().getTileAt(pos);
+                    tile.setFlag(TileFlags.PLAYER);
+                    _client.sendEvent(ChatEventFactory.fromDM("", eventArgs.getAuthor(), String.format("You've joined the dungeon!", eventArgs.getAuthor())));
                 }
-                catch (InterruptedException | ExecutionException ignored) {
-                }
-                break;
+                return;
             default:
-                break;
+                return;
         }
     }
 
     public static void main(String[] args) {
         var display = new ConsoleWriter();
-        var logger = new DefaultLogger(ChatBot.class.getSimpleName(), Level.FINE, display);
+        var logger = new DefaultLogger(DoDClient.class.getSimpleName(), Level.FINE, display);
 
         var config = new ConfigurationBuilder()
                 .addConsole(args)
                 .build();
 
         var helpMenu = new HelpMenuBuilder()
-                .setTitle("==ChatBot==")
+                .setTitle("==DoDClient==")
                 .addItem("cca", "Sets the host of the server the client will attempt a connection to")
                 .addItem("ccp", "Sets the port of the server the client will attempt a connection to")
                 .addItem("name", "Sets the name to use for this session")
@@ -172,10 +186,16 @@ public class ChatBot {
         }
 
         if (!config.isSet("name")) {
-            config.setString("name", "ChatBot");
+            config.setString("name", "DoDClient");
         }
 
-        var bot = new ChatBot(config, logger);
+        var loader = new DoDLoader();
+        var game = loader.run();
+        if (game == null) {
+            return;
+        }
+
+        var bot = new DoDClient(config, logger, game);
 
         try {
             bot.connect();

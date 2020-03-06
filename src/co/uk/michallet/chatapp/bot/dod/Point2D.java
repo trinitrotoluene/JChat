@@ -48,4 +48,9 @@ public class Point2D {
 
         return ((Point2D) obj).equals(this);
     }
+
+    @Override
+    public String toString() {
+        return String.format("(%s, %s)", _x, _y);
+    }
 }

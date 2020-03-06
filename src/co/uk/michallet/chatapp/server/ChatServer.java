@@ -1,7 +1,9 @@
 package co.uk.michallet.chatapp.server;
 
+import co.uk.michallet.chatapp.common.AppThreadPool;
 import co.uk.michallet.chatapp.common.ConfigurationBuilder;
 import co.uk.michallet.chatapp.common.ConsoleWriter;
+import co.uk.michallet.chatapp.common.HelpMenuBuilder;
 import co.uk.michallet.chatapp.common.IConfiguration;
 import co.uk.michallet.chatapp.common.ILogger;
 import co.uk.michallet.chatapp.common.SDK.ChatEventFactory;
@@ -58,6 +60,15 @@ public class ChatServer {
      */
     public void abort() {
         dispose();
+        for (var client : _messageBus.getNames()) {
+            try {
+                var session = _messageBus.getClient(client);
+                session.send(ChatEventFactory.fromGoodbye());
+                session.close();
+            }
+            catch (IOException ignored) {
+            }
+        }
     }
 
     /**
@@ -153,7 +164,7 @@ public class ChatServer {
                     }
                 }
             }
-        });
+        }, AppThreadPool.getInstance());
     }
 
     /**
@@ -164,20 +175,20 @@ public class ChatServer {
         // Run this on a threadpool thread
         return CompletableFuture.runAsync(() -> {
             _logger.info("ready");
-            while(!Thread.interrupted() && _socket.isBound()) {
+            while(!Thread.interrupted() && !_socket.isClosed()) {
                 try {
                     // Block on accept();
                     var clientSocket = _socket.accept();
                     // Prepare to handle the client handshake
                     var handshaker = new ClientSessionNegotiator(_logger, clientSocket, _messageBus);
                     // Chain an async continuation that calls handleSession() to the result of the handshake
-                    CompletableFuture.supplyAsync(handshaker).thenAcceptAsync(this::handleSession);
+                    CompletableFuture.supplyAsync(handshaker, AppThreadPool.getInstance()).thenAcceptAsync(this::handleSession, AppThreadPool.getInstance());
                 }
                 catch (IOException ignored) {
                     return;
                 }
             }
-        });
+        }, AppThreadPool.getInstance());
     }
 
     /**
@@ -219,7 +230,6 @@ public class ChatServer {
         if (!_cleanupLock.tryAcquire()) {
             return;
         }
-
         try {
             _logger.info("closing socket");
             _socket.close();
@@ -243,6 +253,17 @@ public class ChatServer {
         var configuration = new ConfigurationBuilder()
                 .addConsole(args)
                 .build();
+
+        var helpMenu = new HelpMenuBuilder()
+                .setTitle("==ChatServer==")
+                .addItem("csp", "The port that the server should bind to. Defaults to 14001")
+                .addItem("csa", "The ipv4 host that the server should bind on. Defaults to 127.0.0.1")
+                .build();
+
+        if (configuration.isSet("help")) {
+            display.write(helpMenu);
+            return;
+        }
 
         // Configure a new ChatServer.
         var server = new ChatServer(configuration, logger);

@@ -1,5 +1,7 @@
 package co.uk.michallet.chatapp.bot.dod;
 
+import co.uk.michallet.chatapp.bot.NetworkedPlayer;
+
 /**
  * Implementation of the MOVE command from spec.
  */
@@ -21,7 +23,7 @@ public final class MoveCommand implements GameCommand {
      * @param context The context the command should be executed in.
      */
     @Override
-    public void execute(CommandContext context) {
+    public void execute(DoDCommandContext context) {
         var sender = context.getSender();
         if (context.getArgs().length != 1)
         {
@@ -50,7 +52,7 @@ public final class MoveCommand implements GameCommand {
         var currentTile = context.getMap().getTileAt(sender);
 
         if (nextTile.isLegalMove()) {
-            if (sender instanceof Player)
+            if (sender instanceof Player || sender instanceof NetworkedPlayer)
             {
                 currentTile.unsetFlag(TileFlags.PLAYER);
                 nextTile.setFlag(TileFlags.PLAYER);

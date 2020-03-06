@@ -21,7 +21,7 @@ public class ClientCommands {
         return new ExecutionResult(true);
     }
 
-    @Command("RENAME")
+    @Command("NICK")
     public IResult rename(String[] args) {
         if (args.length != 1) {
             return new ExecutionResult(false, "only one parameter accepted");

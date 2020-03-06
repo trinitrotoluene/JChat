@@ -1,49 +1,44 @@
-To <insert classmate code-reviewing this>, if you'd like the source code of this in its original (structured) form,
-send me an email @ prm45@bath.ac.uk or Discord nitro#0001 and I'll send it to you.
+If you'd like to view the source-code in its original form with subdirectories and package declarations,
+send me an email @ prm45@bath.ac.uk or Discord nitro#0001 and I'll send you a copy.
+Since subfolders are against the specification, the flattened version is submitted here.
 
-Since project structure is against the specification, the flattened version is enclosed here for your pleasure.
-
-This project requires Java 11+ to compile due to a dependency on java.net.http
-
-Linux.Bath's openjdk installation supports Java 11, so if you're having difficulty compiling, check your version or do it there.
+Note: Ensure you're using a version of java that supports "var" syntax i.e. 10+ (Linux.Bath runs Java 11).
 
 Implemented features:
 
 = Server =
-Entry Point: ChatServer.java
+Entry Point: ChatServer
 - Fast and fault tolerant, capable of reliably supporting a large number of concurrent clients
 - Robust commands system for server management
     LIST        : List all connected clients
     BROADCAST   : Send a message to all connected clients
     EXIT        : Shut down the server
-    KICK <name> : Disconnects a client from the server
 - Support for direct messages
-- Support for username changes
 - Announces user join/leave
 
 = Client =
-Entry Point: ChatClient.java
+Entry Point: ChatClient
 - Fully asynchronous with send/receive operating independently
 - Responsive and reliable
 - Easy to configure and use
 - Makes use of all available server features
 - Commands
     DM <USER> <MESSAGE> : Send a user a message, privately
-    NICK <NAME>         : Change your name if it's available
     EXIT                : Disconnect and shut down
+    NICK <NAME>         : Change your name
 
 = Bot =
-Entry Point: ChatBot.java
+Entry Point: ChatBot
 - Run with ChatBot and the same CLI options as the ChatClient
 - Commands
     ECHO    : Echoes a provided message back to you
     DADJOKE : :^)
+    HELP    : Information about available commands
 
 = DoD =
-Entry Point: DoDClient.java
-- Run with the --map argument to select a map from the ./maps folder
+Entry Point: DoDClient
+- Select a map from the menu at startup
 - Otherwise supports the same config options as ChatClient/ChatBot
 - Commands
     JOIN  : Join the game
-    LEAVE : Leave the game
     <All other DoD commands>

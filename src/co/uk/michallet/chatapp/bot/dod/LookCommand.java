@@ -34,6 +34,6 @@ public final class LookCommand implements GameCommand {
             sb.append(System.lineSeparator());
         }
 
-        context.getSender().sendMessage(sb.toString());
+        context.getSender().sendMessage(String.format("%n%s", sb.toString()));
     }
 }

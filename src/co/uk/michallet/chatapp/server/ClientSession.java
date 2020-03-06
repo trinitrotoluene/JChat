@@ -59,7 +59,7 @@ public class ClientSession implements Runnable {
     @Override
     public void run() {
         try {
-            while (!Thread.interrupted()) {
+            while (!Thread.interrupted() && !_socket.isClosed()) {
                 var eventData = readEvent();
 
                 if (eventData == null) {

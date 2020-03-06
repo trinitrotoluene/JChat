@@ -14,7 +14,8 @@
         <mkdir dir="${build}"/>
         <delete>
             <fileset dir="${build}">
-                <include name="**/*"/>
+                <include name="**/*.java"/>
+                <exclude name="**/*.txt"/>
             </fileset>
         </delete>
         <mkdir dir="${build}/server"/>

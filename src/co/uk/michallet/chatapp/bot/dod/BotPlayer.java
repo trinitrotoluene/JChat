@@ -25,7 +25,6 @@ public final class BotPlayer extends PlayerBase {
             var nextMove = this._currentPath.pop();
             return getMoveCommandFromPoint(nextMove);
         }
-
         // Waste the turn. Bot doesn't need to go through the text-based command API when using look();
         return "";
     }

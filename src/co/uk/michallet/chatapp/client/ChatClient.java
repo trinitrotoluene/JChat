@@ -1,6 +1,8 @@
 package co.uk.michallet.chatapp.client;
 
 import co.uk.michallet.chatapp.common.ConfigurationBuilder;
+import co.uk.michallet.chatapp.common.ConsoleWriter;
+import co.uk.michallet.chatapp.common.HelpMenuBuilder;
 import co.uk.michallet.chatapp.common.IConfiguration;
 import co.uk.michallet.chatapp.common.ILogger;
 import co.uk.michallet.chatapp.common.IOutputWriter;
@@ -55,6 +57,7 @@ public class ChatClient {
 
     public synchronized void cancel() {
         if (_listenTask != null) {
+            _client.dispose();
             _listenTask.cancel(true);
         }
     }
@@ -165,6 +168,11 @@ public class ChatClient {
                 var dmArgs = (DmEventArgs)event.getEventArgs();
                 _displayOutput.write(String.format("[%s -> %s] %s", dmArgs.getSenderName(), dmArgs.getTargetName(), dmArgs.getContent()));
                 break;
+            case GOODBYE:
+                _logger.error("Server closed the connection");
+                _client.dispose();
+                System.exit(0);
+                break;
             // Received an unexpected OpCode
             default:
                 _logger.debug("received unknown opcode from server");
@@ -208,16 +216,23 @@ public class ChatClient {
     public static void main(String[] args) {
         var input = new Scanner(System.in);
 
-        // Use a displaywriter with custom height rather than the default ConsoleWriter implementation
-        var display = new DisplayWriter(15);
+        IOutputWriter display = new DisplayWriter(15);
         var logger = new DefaultLogger(ChatClient.class.getSimpleName(), Level.FINE, display);
 
         var config = new ConfigurationBuilder()
                 .addConsole(args)
                 .build();
 
+        var helpMenu = new HelpMenuBuilder()
+                .setTitle("==ChatClient==")
+                .addItem("cca", "Sets the host of the server the client will attempt a connection to")
+                .addItem("ccp", "Sets the port of the server the client will attempt a connection to")
+                .addItem("name", "Sets the name to use for this session")
+                .build();
+
         if (config.isSet("help")) {
-            printHelp(display);
+            display = new ConsoleWriter();
+            display.write(helpMenu);
             return;
         }
 
@@ -235,15 +250,5 @@ public class ChatClient {
         catch (InterruptedException interruptEx) {
             logger.error("main client thread was interrupted");
         }
-    }
-
-    private static void printHelp(IOutputWriter display) {
-        display.write("                 == Usage Instructions for ChatClient ==");
-        display.write("");
-        display.write("All options can be set in the GNU or POSIX formats i.e. -cca <value> --cca=<value>");
-        display.write("cca       | Sets the host of the server the client will attempt a connection to.");
-        display.write("ccp       | Sets the port of the server the client will attempt a connection to.");
-        display.write("help      | Displays this menu");
-        display.write("name      | Sets a name to use for the session.");
     }
 }
